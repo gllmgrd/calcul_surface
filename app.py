@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 import cv2
 import numpy as np
 
+import os
+port = int(os.environ.get('PORT', 5000))
 app = Flask(__name__)
 
 
@@ -23,4 +25,4 @@ def detect_contours_api():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=port)
