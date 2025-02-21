@@ -7,7 +7,7 @@ import io
 from flask_cors import CORS  # Autoriser les requêtes depuis Squarespace
 
 app = Flask(__name__)
-CORS(app)  # Active CORS pour accepter les requêtes externes
+CORS(app, resources={r"/*": {"origins": "*"}})  # Autorise toutes les origines
 
 # Fonction pour supprimer le fond vert
 def remove_green_background(image):
@@ -57,7 +57,7 @@ def process_image():
         surface = 123.45  # Remplacer par ton calcul réel
 
         return jsonify({'surface': surface})
-    
+
     except Exception as e:
             print("Erreur serveur :", str(e))  # Ajout d'un log dans Render
             return jsonify({"error": "Erreur interne"}), 500
