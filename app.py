@@ -1,7 +1,7 @@
 import os
 import cv2
 import numpy as np
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from PIL import Image
 import io
 from flask_cors import CORS  # Autoriser les requêtes depuis Squarespace
@@ -10,14 +10,15 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Autorise toutes les origines
 
 # Fonction pour supprimer le fond vert
-def remove_green_background(image):
+def remove_green_background(image, lower_bound, upper_bound):
+    """Supprime le fond vert avec seuils ajustables."""
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower_bound, upper_bound = 35, 85  # Valeurs initiales
     lower_green = np.array([lower_bound, 50, 50])
     upper_green = np.array([upper_bound, 255, 255])
     mask = cv2.inRange(hsv, lower_green, upper_green)
     result = image.copy()
-    result[mask == 255] = [255, 255, 255]
+    result[mask == 255] = [255, 255, 255]  # Fond blanc
+
     return result
 
 
@@ -44,19 +45,21 @@ def home():
 def process_image():
     try:
         if 'image' not in request.files:
-            return jsonify({"error": "Aucune image reçue"}), 400
+            return jsonify({"error": "Aucune image envoyée"}), 400
 
         file = request.files['image']
-        image = Image.open(io.BytesIO(file.read()))
-        image = np.array(image)
-        contours, hierarchy = detect_contours(image)
+        image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
 
-        # Appel à d'autres fonctions comme `select_contours` et `calculate_surface` ici
+        # Récupérer les seuils de l'utilisateur (avec valeurs par défaut)
+        lower_bound = int(request.form.get('lower', 35))
+        upper_bound = int(request.form.get('upper', 85))
 
-        # Simulation d'une surface calculée
-        surface = 123.45  # Remplacer par ton calcul réel
+        processed_image = remove_green_background(image, lower_bound, upper_bound)
 
-        return jsonify({'surface': surface})
+        # Sauvegarde temporaire et envoi du fichier
+        output_path = "processed.png"
+        cv2.imwrite(output_path, processed_image)
+        return send_file(output_path, mimetype='image/png')
 
     except Exception as e:
             print("Erreur serveur :", str(e))  # Ajout d'un log dans Render
