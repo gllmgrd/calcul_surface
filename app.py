@@ -22,20 +22,13 @@ def remove_green_background(image, lower_bound, upper_bound):
     return result
 
 
-# Fonction pour détecter les contours et renvoyer les indices
+# Fonction pour détecter les contours
 def detect_contours(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours
+    return contours, hierarchy
 
-
-# Fonction pour calculer la surface
-def calculate_surface(external_contours, internal_contours, scale_factor):
-    external_area = sum(cv2.contourArea(contour) * (scale_factor ** 2) for contour in external_contours)
-    internal_area = sum(cv2.contourArea(contour) * (scale_factor ** 2) for contour in internal_contours)
-    total_area = external_area - internal_area
-    return total_area
 
 @app.route('/')
 def home():
@@ -68,32 +61,29 @@ def process_image():
 @app.route('/detect_contours', methods=['POST'])
 def detect_contours_api():
     try:
-        data = request.get_json()
-        image_url = data.get('image_url')
-
-        if not image_url:
+        if 'image' not in request.files:
             return jsonify({"error": "Aucune image reçue"}), 400
 
-        # Télécharger l'image depuis l'URL temporaire
-        image = Image.open(io.BytesIO(requests.get(image_url).content))
-        image = np.array(image)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        file = request.files['image']
+        image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
 
         # Détection des contours
-        contours = detect_contours(image)
+        contours, hierarchy = detect_contours(image)
+
+        # Préparer les contours sous forme de liste de points
+        contours_data = []
+        for contour in contours:
+            contours_data.append(contour.tolist())  # Convertir les contours en liste
 
         # Dessiner les contours sur l'image
-        contour_image = np.ones_like(image) * 255  # Fond blanc
-        cv2.drawContours(contour_image, contours, -1, (0, 0, 0), 2)  # Dessiner les contours en noir
+        cv2.drawContours(image, contours, -1, (255, 0, 0), 2)  # Dessiner les contours en bleu
 
-        # Sauvegarde de l'image avec les contours
+        # Sauvegarde et envoi du fichier
         output_path = "contours.png"
-        cv2.imwrite(output_path, contour_image)
+        cv2.imwrite(output_path, image)
 
-        # Renvoi des indices des contours détectés avec l'image
-        contours_info = [{"index": i, "area": cv2.contourArea(contour)} for i, contour in enumerate(contours)]
-        
-        return jsonify({"contours_info": contours_info, "image_url": output_path})
+        # Renvoyer l'image avec contours et les données des contours
+        return jsonify({"contours": contours_data}), 200
 
     except Exception as e:
         print("Erreur serveur :", str(e))
