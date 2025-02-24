@@ -5,3 +5,4 @@ opencv-python-headless
 pillow
 gunicorn
 pillow
+requests
