@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, send_file
 from PIL import Image
 import io
 from flask_cors import CORS  # Autoriser les requêtes depuis Squarespace
+import requests  # Ajouter cette ligne
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Autorise toutes les origines
