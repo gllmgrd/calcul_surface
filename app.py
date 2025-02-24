@@ -65,5 +65,32 @@ def process_image():
             print("Erreur serveur :", str(e))  # Ajout d'un log dans Render
             return jsonify({"error": "Erreur interne"}), 500
 
+@app.route('/detect_contours', methods=['POST'])
+def detect_contours_api():
+    try:
+        data = request.get_json()
+        image_url = data.get('image_url')
+
+        if not image_url:
+            return jsonify({"error": "Aucune image reçue"}), 400
+
+        # Télécharger l'image depuis l'URL temporaire
+        image = Image.open(io.BytesIO(requests.get(image_url).content))
+        image = np.array(image)
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        # Détection des contours
+        contours, hierarchy = detect_contours(image)
+        cv2.drawContours(image, contours, -1, (255, 0, 0), 2)  # Dessiner les contours en bleu
+
+        # Sauvegarde et envoi du fichier
+        output_path = "contours.png"
+        cv2.imwrite(output_path, image)
+        return send_file(output_path, mimetype='image/png')
+
+    except Exception as e:
+        print("Erreur serveur :", str(e))
+        return jsonify({"error": "Erreur interne"}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)
