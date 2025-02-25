@@ -20,7 +20,7 @@ def detect_contours(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 254, 255, cv2.THRESH_BINARY_INV)
 
-    # Utilisation de cv2.RETR_TREE pour récupérer les contours intérieurs et extérieurs
+    # Récupérer les contours avec hiérarchie
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     return contours, hierarchy
@@ -65,13 +65,11 @@ def detect_contours_api():
         if hierarchy is None:
             return jsonify({"error": "Aucun contour détecté"}), 400
 
-        # Séparation des contours externes et internes
+        # Sélectionner uniquement les contours extérieurs
         external_contours = [contours[i] for i in range(len(contours)) if hierarchy[0][i][3] == -1]
-        internal_contours = [contours[i] for i in range(len(contours)) if hierarchy[0][i][3] != -1]
 
-        # Dessiner les contours externes en BLEU et internes en ROUGE
+        # Dessiner uniquement les contours extérieurs en BLEU
         cv2.drawContours(image, external_contours, -1, (255, 0, 0), 2)  # Bleu pour contours externes
-        cv2.drawContours(image, internal_contours, -1, (0, 0, 255), 2)  # Rouge pour contours internes
 
         output_path = "contours_detected.png"
         cv2.imwrite(output_path, image)
