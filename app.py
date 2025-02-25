@@ -18,7 +18,7 @@ def remove_green_background(image, lower_bound, upper_bound):
 
 def detect_contours(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+    _, thresh = cv2.threshold(gray, 254, 255, cv2.THRESH_BINARY_INV)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return contours
 
@@ -71,8 +71,8 @@ def detect_contours_api():
         file = request.files['image']
         image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
 
-        click_x = int(request.form.get("click_x", 0))
-        click_y = int(request.form.get("click_y", 0))
+        click_x = int(float(request.form.get("click_x", 0)))
+        click_y = int(float(request.form.get("click_y", 0)))
 
         contours = detect_contours(image)
         selected_contour = find_closest_contour(contours, click_x, click_y)
