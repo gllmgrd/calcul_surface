@@ -8,6 +8,8 @@ from flask_cors import CORS  # Importe CORS pour gérer les demandes de ressourc
 app = Flask(__name__)  # Crée une instance de l'application Flask.
 CORS(app, resources={r"/*": {"origins": "*"}})  # Active le CORS pour permettre l'accès à l'API depuis n'importe quelle origine.
 
+scale_factor = None  # Variable globale pour stocker l'échelle (mm/pixel)
+
 def remove_green_background(image, lower_bound, upper_bound):
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)  # Convertit l'image en espace colorimétrique HSV (teinte, saturation, valeur).
     lower_green = np.array([lower_bound, 50, 50])  # Définit la couleur verte inférieure en HSV avec des bornes ajustées.
@@ -89,31 +91,67 @@ def detect_contours_api():
         print("Erreur serveur :", str(e))  # Affiche l'erreur sur le serveur.
         return jsonify({"error": "Erreur interne"}), 500  # Retourne une erreur interne au client.
 
-@app.route('/calculate_surface', methods=['POST'])
-def calculate_surface():
+
+
+@app.route('/set_scale', methods=['POST'])
+def set_scale():
+    """Définit l'échelle de conversion pixels -> mm à partir de deux points donnés."""
+    global scale_factor
     try:
-        if 'image' not in request.files:  # Vérifie si l'image est présente dans la requête
+        if 'image' not in request.files:
             return jsonify({"error": "Aucune image envoyée"}), 400
 
         file = request.files['image']
         image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
 
-        click_x = int(float(request.form.get("click_x", 0)))  # Récupère la coordonnée X du clic
-        click_y = int(float(request.form.get("click_y", 0)))  # Récupère la coordonnée Y du clic
+        # Récupère les points envoyés par le frontend
+        x1, y1 = int(request.form.get("x1", 0)), int(request.form.get("y1", 0))
+        x2, y2 = int(request.form.get("x2", 0)), int(request.form.get("y2", 0))
+        real_length_mm = float(request.form.get("real_length", 10))  # Longueur réelle en mm
 
-        contours = detect_contours(image)  # Détecte les contours dans l'image
-        selected_contour = find_closest_contour(contours, click_x, click_y)  # Trouve le contour le plus proche du clic
+        # Calcule la distance entre les deux points en pixels
+        pixel_length = np.linalg.norm(np.array([x2, y2]) - np.array([x1, y1]))
 
-        if selected_contour is None:  # Vérifie si un contour a été trouvé
-            return jsonify({"error": "Aucun contour trouvé"}), 400
+        if pixel_length == 0:
+            return jsonify({"error": "Les points doivent être distincts"}), 400
 
-        surface_pixels = cv2.contourArea(selected_contour)  # Calcule l'aire du contour en pixels
-
-        # Retourne la surface en pixels (il faudra convertir en cm² si nécessaire sur le frontend)
-        return jsonify({"surface": surface_pixels})
+        # Calcule le facteur d'échelle (mm/pixel)
+        scale_factor = real_length_mm / pixel_length
+        return jsonify({"scale_factor": scale_factor})
 
     except Exception as e:
         print("Erreur serveur :", str(e))
         return jsonify({"error": "Erreur interne"}), 500
-if __name__ == "__main__":  # Vérifie si le script est exécuté directement.
-    app.run(debug=True)  # Démarre l'application Flask en mode débogage pour un développement interactif.
+
+
+@app.route('/calculate_surface', methods=['POST'])
+def calculate_surface():
+    """Calcule la surface d'un contour sélectionné et la convertit en cm² si l'échelle est définie."""
+    global scale_factor
+    try:
+        if 'image' not in request.files:
+            return jsonify({"error": "Aucune image envoyée"}), 400
+
+        if scale_factor is None:
+            return jsonify({"error": "L'échelle n'est pas encore définie"}), 400
+
+        file = request.files['image']
+        image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
+
+        click_x = int(float(request.form.get("click_x", 0)))
+        click_y = int(float(request.form.get("click_y", 0)))
+
+        contours = detect_contours(image)
+        selected_contour = find_closest_contour(contours, click_x, click_y)
+
+        if selected_contour is None:
+            return jsonify({"error": "Aucun contour trouvé"}), 400
+
+        surface_pixels = cv2.contourArea(selected_contour)  # Surface en pixels²
+        surface_cm2 = (surface_pixels * (scale_factor ** 2)) / 100  # Conversion en cm²
+
+        return jsonify({"surface_cm2": surface_cm2})
+
+    except Exception as e:
+        print("Erreur serveur :", str(e))
+        return jsonify({"error": "Erreur interne"}), 500
